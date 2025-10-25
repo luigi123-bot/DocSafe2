@@ -19,22 +19,6 @@ interface OCROptions {
   enhanced: boolean;
 }
 
-interface ProcessedDocument {
-  id: string;
-  name: string;
-  type: string;
-  category: string;
-  date: string;
-  user: string;
-  ocrStatus: 'Complete' | 'Pending' | 'Failed';
-  size: number;
-  ocrText: string;
-  metadata: {
-    uploadedBy: string;
-    category: string;
-    type: string;
-  };
-}
 
 export default function EnhancedDocumentUploader() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -280,17 +264,6 @@ export default function EnhancedDocumentUploader() {
     }
   };
 
-  const handleDocumentSave = (documentData: ProcessedDocument) => {
-    console.log('Documento guardado desde el visor:', documentData);
-    alert('Documento procesado y guardado exitosamente!');
-    
-    // Reset form
-    setSelectedFile(null);
-    setPreviewUrl(null);
-    setOcrResult(null);
-    setProgress(0);
-    setShowDocumentViewer(false);
-  };
 
   const handleViewerClose = () => {
     setShowDocumentViewer(false);
@@ -515,7 +488,6 @@ export default function EnhancedDocumentUploader() {
         <DocumentViewer
           file={selectedFile}
           onClose={handleViewerClose}
-          onSave={handleDocumentSave}
         />
       )}
     </div>

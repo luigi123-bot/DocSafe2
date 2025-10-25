@@ -9,24 +9,6 @@ import styles from "./DocumentViewer.module.css";
 interface DocumentViewerProps {
   file: File | null;
   onClose: () => void;
-  onSave?: (documentData: ProcessedDocument) => void;
-}
-
-interface ProcessedDocument {
-  id: string;
-  name: string;
-  type: string;
-  category: string;
-  date: string;
-  user: string;
-  ocrStatus: 'Complete' | 'Pending' | 'Failed';
-  size: number;
-  ocrText: string;
-  metadata: {
-    uploadedBy: string;
-    category: string;
-    type: string;
-  };
 }
 
 interface ToastMessage {
@@ -36,18 +18,16 @@ interface ToastMessage {
   duration?: number;
 }
 
-export default function DocumentViewer({ file, onClose, onSave }: DocumentViewerProps) {
+export default function DocumentViewer({ file, onClose }: DocumentViewerProps) {
   const [ocrText, setOcrText] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
   const [ocrStatus, setOcrStatus] = useState<'idle' | 'processing' | 'complete' | 'error'>('idle');
-  const [documentMetadata, setDocumentMetadata] = useState({
+  const [documentMetadata] = useState({
     category: "Financial Reports",
     type: file?.type.includes('pdf') ? 'PDF' : file?.type.includes('image') ? 'Image' : 'Document',
     uploadedBy: "Usuario Actual"
   });
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages] = useState(1);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(100);
   const [rotation, setRotation] = useState(0);
@@ -84,7 +64,6 @@ export default function DocumentViewer({ file, onClose, onSave }: DocumentViewer
     const id = Date.now().toString();
     const newToast: ToastMessage = { id, type, message, duration };
     setToasts(prev => [...prev, newToast]);
-    
     setTimeout(() => {
       setToasts(prev => prev.filter(toast => toast.id !== id));
     }, duration);
@@ -94,35 +73,6 @@ export default function DocumentViewer({ file, onClose, onSave }: DocumentViewer
   const closeToast = (id: string) => {
     setToasts(prev => prev.filter(toast => toast.id !== id));
   };
-
-  // Cargar datos del localStorage al montar
-  useEffect(() => {
-    if (file) {
-      const savedData = localStorage.getItem(`document_${file.name}_${file.size}`);
-      if (savedData) {
-        try {
-          const parsed = JSON.parse(savedData) as {
-            ocrText?: string;
-            ocrStatus?: 'idle' | 'processing' | 'complete' | 'error';
-            metadata?: typeof documentMetadata;
-            zoomLevel?: number;
-            rotation?: number;
-          };
-          setOcrText(parsed.ocrText ?? "");
-          setOcrStatus(parsed.ocrStatus ?? 'idle');
-          if (parsed.metadata) {
-            setDocumentMetadata(prev => ({...prev, ...parsed.metadata}));
-          }
-          setZoomLevel(parsed.zoomLevel ?? 100);
-          setRotation(parsed.rotation ?? 0);
-          showToast('info', 'Documento cargado desde el historial', 2000);
-        } catch (error) {
-          console.error('Error loading document data:', error);
-          showToast('error', 'Error al cargar datos guardados');
-        }
-      }
-    }
-  }, [file]);
 
   // Guardar en localStorage cuando cambian los datos
   useEffect(() => {
@@ -172,41 +122,6 @@ export default function DocumentViewer({ file, onClose, onSave }: DocumentViewer
   const handleFullscreen = () => {
     setIsFullscreen(!isFullscreen);
     showToast('info', isFullscreen ? 'Modo ventana' : 'Modo pantalla completa', 1500);
-  };
-
-  const handleDownload = () => {
-    if (imageUrl && file) {
-      const link = document.createElement('a');
-      link.href = imageUrl;
-      link.download = file.name;
-      link.click();
-      showToast('success', 'Descarga iniciada', 2000);
-    } else {
-      showToast('error', 'No se puede descargar el archivo');
-    }
-  };
-
-  const handleShare = async () => {
-    if (navigator.share && file) {
-      try {
-        await navigator.share({
-          title: `Documento: ${file.name}`,
-          text: `Compartiendo documento procesado con OCR`,
-          files: [file]
-        });
-        showToast('success', 'Documento compartido exitosamente');
-      } catch {
-        showToast('error', 'Error al compartir documento');
-      }
-    } else {
-      // Fallback: copiar al portapapeles
-      if (navigator.clipboard && ocrText) {
-        await navigator.clipboard.writeText(ocrText);
-        showToast('success', 'Texto OCR copiado al portapapeles');
-      } else {
-        showToast('warning', 'Función de compartir no disponible');
-      }
-    }
   };
 
   // Simular proceso de OCR con toasts
@@ -266,49 +181,6 @@ Se espera un crecimiento continuo del 15-18% en el próximo ejercicio fiscal, co
       setIsProcessing(false);
       clearInterval(progressInterval);
       showToast('error', 'Error durante el procesamiento OCR');
-    }
-  };
-
-  const handleSave = () => {
-    if (!file || !onSave) return;
-
-    try {
-      const documentData: ProcessedDocument = {
-        id: Date.now().toString(),
-        name: file.name,
-        type: documentMetadata.type,
-        category: documentMetadata.category,
-        date: new Date().toISOString().split('T')[0] ?? '',
-        user: documentMetadata.uploadedBy,
-        ocrStatus: ocrStatus === 'complete' ? 'Complete' : ocrStatus === 'error' ? 'Failed' : 'Pending',
-        size: file.size,
-        ocrText: ocrText,
-        metadata: documentMetadata
-      };
-
-      // Guardar en localStorage de documentos guardados
-      const savedDocumentsJson = localStorage.getItem('savedDocuments') ?? '[]';
-      const savedDocuments: ProcessedDocument[] = JSON.parse(savedDocumentsJson) as ProcessedDocument[];
-      savedDocuments.push(documentData);
-      localStorage.setItem('savedDocuments', JSON.stringify(savedDocuments));
-
-      onSave(documentData);
-      showToast('success', 'Documento guardado exitosamente', 3000);
-      
-      // Cerrar modal después de un breve delay
-      setTimeout(() => {
-        onClose();
-      }, 1000);
-    } catch {
-      showToast('error', 'Error al guardar el documento');
-    }
-  };
-
-  const handleEdit = () => {
-    const newText = prompt("Editar texto OCR:", ocrText);
-    if (newText !== null && newText !== ocrText) {
-      setOcrText(newText);
-      showToast('success', 'Texto OCR actualizado', 2000);
     }
   };
 
@@ -442,7 +314,7 @@ Se espera un crecimiento continuo del 15-18% en el próximo ejercicio fiscal, co
                 </div>
               </div>
 
-              {/* Interactive Controls - SIEMPRE VISIBLE */}
+              {/* Interactive Controls */}
               <div className="bg-white border-t border-gray-200 px-4 py-3 shadow-lg flex-shrink-0">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -485,86 +357,23 @@ Se espera un crecimiento continuo del 15-18% en el próximo ejercicio fiscal, co
                       🔄
                     </Button>
                   </div>
-
-                  <div className="flex items-center gap-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                      disabled={currentPage <= 1}
-                      className="hover:bg-red-50 hover:border-red-300 transition-colors"
-                    >
-                      ← Anterior
-                    </Button>
-                    <span className="text-sm text-gray-600 px-2 py-1 bg-red-50 rounded border text-center min-w-[80px]">
-                      {currentPage} / {totalPages}
-                    </span>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                      disabled={currentPage >= totalPages}
-                      className="hover:bg-red-50 hover:border-red-300 transition-colors"
-                    >
-                      Siguiente →
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={handleDownload}
-                      className="hover:bg-green-50 hover:border-green-300 transition-colors"
-                      title="Descargar archivo"
-                    >
-                      📥
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={handleEdit}
-                      disabled={ocrStatus !== 'complete'}
-                      className="hover:bg-yellow-50 hover:border-yellow-300 transition-colors disabled:opacity-50"
-                      title="Editar texto OCR"
-                    >
-                      ✏️
-                    </Button>
-                    <Button 
-                      className="bg-red-500 hover:bg-red-600 text-white transition-all duration-200"
-                      size="sm"
-                      onClick={handleShare}
-                      title="Compartir documento"
-                    >
-                      📤
-                    </Button>
-                  </div>
                 </div>
               </div>
             </div>
 
             {/* Document Info Panel */}
             <div className="w-80 bg-white border-l border-gray-200 flex flex-col shadow-lg">
-              {/* Info Section - Con scroll si es necesario */}
+              {/* Info Section - Solo mostrar datos, no editar */}
               <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-red-50 to-white flex-shrink-0 max-h-80 overflow-y-auto">
                 <h2 className="text-lg font-semibold text-gray-900 mb-3 flex items-center sticky top-0 bg-gradient-to-r from-red-50 to-white pb-2">
                   <span className="mr-2">📋</span>
                   Información del Documento
                 </h2>
-                
                 <div className="space-y-3 text-sm">
                   <div className="bg-white rounded-lg p-2 border border-gray-100">
                     <label className="block text-gray-500 text-xs font-medium mb-1">Subido por:</label>
-                    <input
-                      type="text"
-                      value={documentMetadata.uploadedBy}
-                      onChange={(e) => setDocumentMetadata(prev => ({...prev, uploadedBy: e.target.value}))}
-                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
-                      placeholder="Nombre del usuario"
-                      title="Nombre del usuario que subió el documento"
-                    />
+                    <div className="font-medium text-gray-900 text-xs">{documentMetadata.uploadedBy}</div>
                   </div>
-                  
                   <div className="flex gap-2">
                     <div className="bg-white rounded-lg p-2 border border-gray-100 flex-1">
                       <label className="block text-gray-500 text-xs font-medium mb-1">Fecha:</label>
@@ -575,22 +384,10 @@ Se espera un crecimiento continuo del 15-18% en el próximo ejercicio fiscal, co
                       <div className="font-medium text-gray-900 text-xs">{(file.size / 1024 / 1024).toFixed(2)} MB</div>
                     </div>
                   </div>
-                  
                   <div className="flex gap-2">
                     <div className="bg-white rounded-lg p-2 border border-gray-100 flex-1">
                       <label className="block text-gray-500 text-xs font-medium mb-1">Categoría:</label>
-                      <select 
-                        value={documentMetadata.category}
-                        onChange={(e) => setDocumentMetadata(prev => ({...prev, category: e.target.value}))}
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-xs focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
-                        title="Seleccionar categoría del documento"
-                      >
-                        <option value="Financial Reports">Financieros</option>
-                        <option value="Contracts">Contratos</option>
-                        <option value="Invoices">Facturas</option>
-                        <option value="Legal Documents">Legales</option>
-                        <option value="General">General</option>
-                      </select>
+                      <div className="font-medium text-gray-900 text-xs">{documentMetadata.category}</div>
                     </div>
                     <div className="bg-white rounded-lg p-2 border border-gray-100 flex-1">
                       <label className="block text-gray-500 text-xs font-medium mb-1">Tipo:</label>
@@ -650,17 +447,11 @@ Se espera un crecimiento continuo del 15-18% en el próximo ejercicio fiscal, co
                         <div className="text-xs text-gray-600 bg-green-100 px-2 py-1 rounded-full">
                           ✅ Texto extraído ({ocrText.length} chars)
                         </div>
-                        <button 
-                          onClick={handleEdit}
-                          className="text-red-500 text-xs hover:underline hover:text-red-600 transition-colors"
-                        >
-                          ✏️ Editar
-                        </button>
                       </div>
                       <textarea
                         value={ocrText}
-                        onChange={(e) => setOcrText(e.target.value)}
-                        className={`flex-1 bg-gray-50 p-3 rounded-lg border border-gray-200 text-sm leading-relaxed resize-none focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all min-h-0 ${styles.scrollableTextarea}`}
+                        readOnly
+                        className={`flex-1 bg-gray-50 p-3 rounded-lg border border-gray-200 text-sm leading-relaxed resize-none focus:outline-none min-h-0 ${styles.scrollableTextarea}`}
                         placeholder="El texto extraído aparecerá aquí..."
                       />
                     </div>
@@ -717,21 +508,14 @@ Se espera un crecimiento continuo del 15-18% en el próximo ejercicio fiscal, co
                 </div>
               </div>
 
-              {/* Action Buttons - SIEMPRE VISIBLE */}
+              {/* Action Buttons - Solo cerrar */}
               <div className="p-4 border-t border-gray-200 space-y-2 bg-gradient-to-r from-red-50 to-white flex-shrink-0">
-                <Button 
-                  onClick={handleSave}
-                  className="w-full bg-red-500 hover:bg-red-600 text-white transition-all duration-200 shadow-md hover:shadow-lg"
-                  disabled={ocrStatus !== 'complete'}
-                >
-                  💾 Guardar Documento
-                </Button>
                 <Button 
                   onClick={onClose}
                   variant="outline" 
                   className="w-full hover:bg-gray-50 transition-colors"
                 >
-                  ❌ Cancelar
+                  ❌ Cerrar
                 </Button>
               </div>
             </div>

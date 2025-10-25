@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from '~/hooks/useAuth';
 import { Button } from "~/components/ui/button";
+import DocumentViewer from "./DocumentViewer";
 
 interface Document {
   id: string;
@@ -54,6 +55,8 @@ export default function DocumentConsultation() {
     current_page: 1,
     per_page: 10
   });
+  const [viewerFile, setViewerFile] = useState<File | null>(null);
+  const [showViewer, setShowViewer] = useState(false);
 
   // Cargar documentos desde la API
   const loadDocuments = useCallback(async () => {
@@ -240,15 +243,19 @@ export default function DocumentConsultation() {
     }
   };
 
-  // Ver documento (abrir URL del archivo en S3)
+  // Ver documento (descargar y mostrar en visor)
   const handleViewDocument = async (document: Document) => {
     try {
       console.log('👁️ Obteniendo URL presignada para documento:', document.id);
-      
       const response = await fetch(`/api/documents/${document.id}/download`);
       if (response.ok) {
-        const data = await response.json() as { url: string };
-        window.open(data.url, '_blank');
+        const data = await response.json() as { url: string; filename?: string };
+        // Descargar el archivo como blob y crear un File para el visor
+        const fileResp = await fetch(data.url);
+        const blob = await fileResp.blob();
+        const file = new File([blob], document.filename, { type: blob.type });
+        setViewerFile(file);
+        setShowViewer(true);
       } else {
         const error = await response.json() as { error: string };
         alert(`Error obteniendo documento: ${error.error}`);
@@ -749,7 +756,7 @@ export default function DocumentConsultation() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">
                       <button 
-                        onClick={() => void handleViewDocument(document)}
+                        onClick={() => handleViewDocument(document)}
                         className="text-gray-400 hover:text-gray-600"
                         title="Ver documento"
                       >
@@ -842,6 +849,17 @@ export default function DocumentConsultation() {
           </div>
         </div>
       </div>
+
+      {/* Document Viewer Modal */}
+      {showViewer && viewerFile && (
+        <DocumentViewer
+          file={viewerFile}
+          onClose={() => {
+            setShowViewer(false);
+            setViewerFile(null);
+          }}
+        />
+      )}
     </div>
   );
 }
