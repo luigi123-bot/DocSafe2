@@ -1,4 +1,12 @@
-declare module "*.css" {
-  const content: Record<string, string>;
-  export default content;
+export {}
+
+// Create a type for the roles
+export type Roles = 'admin' | 'empleado';
+
+declare global {
+  interface CustomJwtSessionClaims {
+    metadata: {
+      role?: Roles
+    }
+  }
 }

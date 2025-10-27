@@ -50,7 +50,7 @@ export default function DocumentUpload({ onUploadSuccess, onClose }: DocumentUpl
           const data = await response.json() as { success: boolean; data: DocumentFolder[] };
           setFolders(data.data || []);
         }
-      } catch (error) {
+      } catch {
         // No mostrar error aquí, solo dejar vacío
       } finally {
         setFoldersLoading(false);

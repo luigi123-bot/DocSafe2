@@ -50,12 +50,16 @@ export default function DocumentViewer({ file, onClose }: DocumentViewerProps) {
     applyTransform(transformRef.current);
   }, [applyTransform]);
 
-  // Crear URL de la imagen cuando se monta el componente
+  // Crear URL de la imagen de forma memoizada para evitar renders innecesarios
   useEffect(() => {
+    let url: string | null = null;
     if (file?.type.startsWith('image/')) {
-      const url = URL.createObjectURL(file);
-      setImageUrl(url);
-      return () => URL.revokeObjectURL(url);
+      url = URL.createObjectURL(file);
+      void Promise.resolve().then(() => setImageUrl(url));
+      return () => {
+        setImageUrl(null);
+        if (url) URL.revokeObjectURL(url);
+      };
     }
   }, [file]);
 
